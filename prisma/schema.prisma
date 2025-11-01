@@ -178,6 +178,7 @@ model Doctor {
   specialties  Specialty[]
   yearsOfExperience Int?
   isActive     Boolean    @default(true)
+  bio          String?
 
   // Location for proximity search
   currentLocationLat Float?
@@ -189,6 +190,7 @@ model Doctor {
   assignments   AppointmentAssignment[]
   sosInvitations SOSInvitation[]
   sosAccepted    SOSRequest[] @relation(name: "SOSAcceptedBy")
+  services       DoctorService[]
 
   @@index([isActive])
   @@index([currentLocationLat, currentLocationLng])
@@ -241,11 +243,44 @@ model Appointment {
   isEmergency Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  total       Decimal?  @db.Decimal(10, 2)
+  closedAt    DateTime?
+
+  report      AppointmentReport? @relation(name: "Appointment_Report")
 
   assignments AppointmentAssignment[]
 
   @@index([status, scheduledAt])
   @@index([specialty])
+}
+// Detailed post-visit report
+model AppointmentReport {
+  id              String   @id @default(cuid())
+  appointmentId   String   @unique
+  diagnosis       String?
+  summary         String?
+  recommendations String?
+  equipmentRequired String?
+  createdAt       DateTime @default(now())
+
+  appointment Appointment @relation(name: "Appointment_Report", fields: [appointmentId], references: [id])
+}
+
+
+// Doctor per-specialty service config and pricing
+model DoctorService {
+  id          String     @id @default(cuid())
+  doctorId    String
+  specialty   Specialty
+  basePrice   Decimal    @db.Decimal(10, 2)
+  perKmRate   Decimal    @db.Decimal(10, 2) @default(15)
+  isOnlineAvailable   Boolean @default(true)
+  isHomeVisitAvailable Boolean @default(true)
+  description String?
+
+  doctor Doctor @relation(fields: [doctorId], references: [id])
+
+  @@unique([doctorId, specialty])
 }
 
 // Represents doctors invited/queued/accepted for an appointment (max 2 active accepted enforced in app logic)
@@ -416,6 +451,6 @@ model NotificationToken {
   token     String               @unique
   platform  NotificationPlatform
   createdAt DateTime             @default(now())
-  
+
   user User @relation(fields: [userId], references: [id])
 }

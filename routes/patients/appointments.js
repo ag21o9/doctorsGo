@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../configs/prisma.js';
 import { attachUser, requireRole } from '../../middlewares/auth.js';
+import { aiClassifySpecialty } from '../../configs/ai.js';
 
 const router = Router();
 router.use(attachUser(false), requireRole(['PATIENT']));
@@ -8,9 +9,15 @@ router.use(attachUser(false), requireRole(['PATIENT']));
 // Create appointment
 router.post('/', async (req, res, next) => {
   try {
-    const { type, mode, specialty, description, toolsRequired, meetLink, scheduledAt, addressId, isEmergency } = req.body;
-    if (!type || !mode || !specialty || !description) {
-      return res.status(400).json({ error: 'type, mode, specialty, description are required' });
+    const { type, mode, specialty, description, toolsRequired, meetLink, scheduledAt, addressId, isEmergency, doctorId } = req.body;
+    if (!type || !mode || !description) {
+      return res.status(400).json({ error: 'type, mode, description are required' });
+    }
+
+    let finalSpecialty = specialty;
+    if (!finalSpecialty) {
+      const triage = await aiClassifySpecialty(description);
+      finalSpecialty = triage.specialty;
     }
 
     const created = await prisma.appointment.create({
@@ -18,7 +25,7 @@ router.post('/', async (req, res, next) => {
         patient: { connect: { id: req.user.patient.id } },
         type,
         mode,
-        specialty,
+  specialty: finalSpecialty,
         description,
         toolsRequired,
         meetLink,
@@ -27,6 +34,19 @@ router.post('/', async (req, res, next) => {
         isEmergency: !!isEmergency,
       },
     });
+    // If patient selected a specific doctor, pre-create an assignment as ACCEPTED position 1
+    if (doctorId) {
+      await prisma.appointmentAssignment.create({
+        data: {
+          appointmentId: created.id,
+          doctorId,
+          status: 'ACCEPTED',
+          queuePosition: 1,
+          acceptedAt: new Date(),
+        },
+      });
+    }
+
     res.status(201).json(created);
   } catch (err) {
     next(err);

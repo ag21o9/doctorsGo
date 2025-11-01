@@ -19,10 +19,14 @@
   },
   "homepage": "https://github.com/ag21o9/doctorsGo#readme",
   "dependencies": {
+    "@langchain/openai": "^1.0.0",
+    "@prisma/client": "^6.18.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "prisma": "^6.18.0",
-    "@prisma/client": "^6.18.0"
+    "jsonwebtoken": "^9.0.2",
+    "langchain": "^1.0.2",
+    "openai": "^6.7.0",
+    "prisma": "^6.18.0"
   }
 }

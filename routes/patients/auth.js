@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../../configs/prisma.js';
+import jwt from 'jsonwebtoken';
 
 const router = Router();
 
@@ -24,7 +25,10 @@ router.post('/register', async (req, res, next) => {
       include: { patient: true },
     });
 
-    res.status(201).json({ token: user.id, user });
+    const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
+  const expiresIn = process.env.JWT_EXPIRES || '7d';
+  const token = jwt.sign({ sub: user.id, role: 'PATIENT' }, secret, { expiresIn });
+  res.status(201).json({ token, user });
   } catch (err) {
     if (err.code === 'P2002') {
       return res.status(409).json({ error: 'User with this email/phone already exists' });
@@ -47,7 +51,10 @@ router.post('/login', async (req, res, next) => {
     });
     if (!user) return res.status(404).json({ error: 'Patient not found' });
 
-    res.json({ token: user.id, user });
+    const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
+  const expiresIn = process.env.JWT_EXPIRES || '7d';
+  const token = jwt.sign({ sub: user.id, role: 'PATIENT' }, secret, { expiresIn });
+  res.json({ token, user });
   } catch (err) {
     next(err);
   }

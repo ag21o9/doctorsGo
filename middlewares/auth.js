@@ -1,4 +1,5 @@
 import { prisma } from '../configs/prisma.js';
+import jwt from 'jsonwebtoken';
 
 // NOTE: Minimal auth middleware for development
 // Expects Authorization: Bearer <userId>
@@ -16,14 +17,25 @@ export function attachUser(optional = false) {
         return res.status(401).json({ error: 'Unauthorized: missing token' });
       }
 
+  const secret = process.env.JWT_SECRET || 'dev_secret_change_me';
+
+      let payload;
+      try {
+        payload = jwt.verify(token, secret);
+      } catch (e) {
+        if (optional) return next();
+        return res.status(401).json({ error: 'Unauthorized: invalid token' });
+      }
+
+      const userId = payload.sub;
       const user = await prisma.user.findUnique({
-        where: { id: token },
+        where: { id: userId },
         include: { patient: true, doctor: true },
       });
 
       if (!user) {
         if (optional) return next();
-        return res.status(401).json({ error: 'Unauthorized: invalid token' });
+        return res.status(401).json({ error: 'Unauthorized: user not found' });
       }
 
       req.user = user;
