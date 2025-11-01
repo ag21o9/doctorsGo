@@ -3,10 +3,8 @@
 
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -169,6 +167,7 @@ model Patient {
 
   appointments Appointment[]
   sosRequests  SOSRequest[]
+  orders       MedOrder[]
 }
 
 model Doctor {
@@ -189,6 +188,7 @@ model Doctor {
   hospitalLinks DoctorHospital[]
   assignments   AppointmentAssignment[]
   sosInvitations SOSInvitation[]
+  sosAccepted    SOSRequest[] @relation(name: "SOSAcceptedBy")
 
   @@index([isActive])
   @@index([currentLocationLat, currentLocationLng])
@@ -201,7 +201,7 @@ model Hospital {
   name       String
   type       HospitalType
   addressId  String?
-  address    Address?     @relation(fields: [addressId], references: [id])
+  address    Address?     @relation(name: "HospitalAddress", fields: [addressId], references: [id])
   latitude   Float?
   longitude  Float?
   specialties Specialty[]
@@ -236,7 +236,7 @@ model Appointment {
   scheduledAt   DateTime?
 
   addressId String?
-  address   Address? @relation(fields: [addressId], references: [id])
+  address   Address? @relation(name: "AppointmentAddress", fields: [addressId], references: [id])
 
   isEmergency Boolean @default(false)
   createdAt   DateTime @default(now())
@@ -281,7 +281,7 @@ model SOSRequest {
   currentRadiusKm Int        @default(5)
   expiresAt       DateTime?
   acceptedById    String?
-  acceptedBy      Doctor?   @relation(fields: [acceptedById], references: [id])
+  acceptedBy      Doctor?   @relation(name: "SOSAcceptedBy", fields: [acceptedById], references: [id])
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -311,7 +311,7 @@ model Pharmacy {
   id        String   @id @default(cuid())
   name      String
   addressId String?
-  address   Address? @relation(fields: [addressId], references: [id])
+  address   Address? @relation(name: "PharmacyAddress", fields: [addressId], references: [id])
   latitude  Float?
   longitude Float?
   isActive  Boolean  @default(true)
@@ -343,6 +343,7 @@ model Inventory {
 
   pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
   medicine Medicine @relation(fields: [medicineId], references: [id])
+  orderItems MedOrderItem[]
 
   @@unique([pharmacyId, medicineId])
 }
@@ -354,7 +355,7 @@ model MedOrder {
   status        OrderStatus   @default(PENDING)
   paymentStatus PaymentStatus @default(UNPAID)
   addressId     String?
-  address       Address?      @relation(fields: [addressId], references: [id])
+  address       Address?      @relation(name: "MedOrderAddress", fields: [addressId], references: [id])
   total         Decimal       @db.Decimal(10, 2) @default(0)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -390,7 +391,12 @@ model Address {
   latitude   Float?
   longitude  Float?
 
-  // Back-relations are explicit on owning models via foreign keys
+  // Back-relations
+  hospitals    Hospital[]   @relation(name: "HospitalAddress")
+  appointments Appointment[] @relation(name: "AppointmentAddress")
+  pharmacies   Pharmacy[]   @relation(name: "PharmacyAddress")
+  medOrders    MedOrder[]   @relation(name: "MedOrderAddress")
+  userLinks    UserAddress[] @relation(name: "UserAddresses")
 }
 
 model UserAddress {
@@ -399,7 +405,7 @@ model UserAddress {
   isPrimary Boolean @default(false)
 
   user    User    @relation(fields: [userId], references: [id])
-  address Address @relation(fields: [addressId], references: [id])
+  address Address @relation(name: "UserAddresses", fields: [addressId], references: [id])
 
   @@id([userId, addressId])
 }
@@ -410,6 +416,6 @@ model NotificationToken {
   token     String               @unique
   platform  NotificationPlatform
   createdAt DateTime             @default(now())
-
+  
   user User @relation(fields: [userId], references: [id])
 }

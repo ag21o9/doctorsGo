@@ -6,16 +6,23 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ag21o9/doctorsGo.git"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
+  "bugs": {
+    "url": "https://github.com/ag21o9/doctorsGo/issues"
+  },
+  "homepage": "https://github.com/ag21o9/doctorsGo#readme",
   "dependencies": {
-    "cloudinary": "^2.8.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "multer": "^2.0.2",
-    "prisma": "^6.18.0"
+    "prisma": "^6.18.0",
+    "@prisma/client": "^6.18.0"
   }
 }
