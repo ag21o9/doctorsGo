@@ -1,0 +1,415 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== Enums =====
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum UserRole {
+  PATIENT
+  DOCTOR
+  ADMIN
+  PHARMACY
+}
+
+enum BloodType {
+  A_POS
+  A_NEG
+  B_POS
+  B_NEG
+  AB_POS
+  AB_NEG
+  O_POS
+  O_NEG
+}
+
+enum Specialty {
+  GENERAL_PHYSICIAN
+  CARDIOLOGY
+  GYNECOLOGY
+  PEDIATRICS
+  ORTHOPEDICS
+  DERMATOLOGY
+  NEUROLOGY
+  PSYCHIATRY
+  PULMONOLOGY
+  GASTROENTEROLOGY
+  NEPHROLOGY
+  ENDOCRINOLOGY
+  ENT
+  OPHTHALMOLOGY
+  DENTISTRY
+  EMERGENCY_MEDICINE
+  UROLOGY
+  ONCOLOGY
+  RADIOLOGY
+  ANESTHESIOLOGY
+  RHEUMATOLOGY
+  PHYSIOTHERAPY
+  PATHOLOGY
+}
+
+enum AppointmentType {
+  ONSPOT
+  SCHEDULED
+  FOLLOW_UP_WEEKLY
+  FOLLOW_UP_MONTHLY
+}
+
+enum AppointmentMode {
+  ONLINE
+  OFFLINE
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AssignmentStatus {
+  INVITED
+  QUEUED
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
+  MISSED
+}
+
+enum SOSStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  FULFILLED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+enum MedicineForm {
+  TABLET
+  CAPSULE
+  SYRUP
+  INJECTION
+  OINTMENT
+  DROPS
+  POWDER
+  OTHER
+}
+
+enum HospitalType {
+  PRIVATE
+  GOVERNMENT
+}
+
+enum NotificationPlatform {
+  FCM
+  APNS
+  WEB
+}
+
+// ===== Core Users =====
+
+model User {
+  id          String      @id @default(cuid())
+  role        UserRole
+  name        String
+  email       String?     @unique
+  phone       String?     @unique
+  gender      Gender?
+  bloodType   BloodType?
+  dateOfBirth DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Profiles
+  patient     Patient?
+  doctor      Doctor?
+
+  // Relations
+  addresses   UserAddress[]
+  notifications NotificationToken[]
+}
+
+model Patient {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  emergencyContact String?
+
+  appointments Appointment[]
+  sosRequests  SOSRequest[]
+}
+
+model Doctor {
+  id           String     @id @default(cuid())
+  userId       String     @unique
+  user         User       @relation(fields: [userId], references: [id])
+  licenseNumber String?
+  specialties  Specialty[]
+  yearsOfExperience Int?
+  isActive     Boolean    @default(true)
+
+  // Location for proximity search
+  currentLocationLat Float?
+  currentLocationLng Float?
+  serviceRadiusKm    Int? @default(5)
+
+  // Associations
+  hospitalLinks DoctorHospital[]
+  assignments   AppointmentAssignment[]
+  sosInvitations SOSInvitation[]
+
+  @@index([isActive])
+  @@index([currentLocationLat, currentLocationLng])
+}
+
+// ===== Healthcare Facilities =====
+
+model Hospital {
+  id         String       @id @default(cuid())
+  name       String
+  type       HospitalType
+  addressId  String?
+  address    Address?     @relation(fields: [addressId], references: [id])
+  latitude   Float?
+  longitude  Float?
+  specialties Specialty[]
+
+  doctors    DoctorHospital[]
+}
+
+model DoctorHospital {
+  doctorId  String
+  hospitalId String
+  isPrimary Boolean @default(false)
+
+  doctor   Doctor   @relation(fields: [doctorId], references: [id])
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+
+  @@id([doctorId, hospitalId])
+}
+
+// ===== Appointments & Queue =====
+
+model Appointment {
+  id            String            @id @default(cuid())
+  patientId     String
+  patient       Patient           @relation(fields: [patientId], references: [id])
+  type          AppointmentType
+  mode          AppointmentMode
+  status        AppointmentStatus  @default(PENDING)
+  specialty     Specialty
+  description   String
+  toolsRequired String?
+  meetLink      String?
+  scheduledAt   DateTime?
+
+  addressId String?
+  address   Address? @relation(fields: [addressId], references: [id])
+
+  isEmergency Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments AppointmentAssignment[]
+
+  @@index([status, scheduledAt])
+  @@index([specialty])
+}
+
+// Represents doctors invited/queued/accepted for an appointment (max 2 active accepted enforced in app logic)
+model AppointmentAssignment {
+  id            String           @id @default(cuid())
+  appointmentId String
+  doctorId      String
+  status        AssignmentStatus @default(QUEUED)
+  queuePosition Int
+  acceptedAt    DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  doctor      Doctor      @relation(fields: [doctorId], references: [id])
+
+  @@unique([appointmentId, queuePosition])
+  @@unique([appointmentId, doctorId])
+}
+
+// ===== SOS / Emergency =====
+
+model SOSRequest {
+  id              String    @id @default(cuid())
+  patientId       String
+  patient         Patient   @relation(fields: [patientId], references: [id])
+  description     String
+  specialty       Specialty
+  status          SOSStatus  @default(PENDING)
+  latitude        Float
+  longitude       Float
+  initialRadiusKm Int        @default(5)
+  currentRadiusKm Int        @default(5)
+  expiresAt       DateTime?
+  acceptedById    String?
+  acceptedBy      Doctor?   @relation(fields: [acceptedById], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  invitations SOSInvitation[]
+
+  @@index([status])
+  @@index([latitude, longitude])
+}
+
+model SOSInvitation {
+  id      String           @id @default(cuid())
+  sosId   String
+  doctorId String
+  status  AssignmentStatus @default(INVITED)
+  sentAt  DateTime         @default(now())
+  respondedAt DateTime?
+
+  sos    SOSRequest @relation(fields: [sosId], references: [id])
+  doctor Doctor     @relation(fields: [doctorId], references: [id])
+
+  @@unique([sosId, doctorId])
+}
+
+// ===== E-commerce (Pharmacy/Medicines) =====
+
+model Pharmacy {
+  id        String   @id @default(cuid())
+  name      String
+  addressId String?
+  address   Address? @relation(fields: [addressId], references: [id])
+  latitude  Float?
+  longitude Float?
+  isActive  Boolean  @default(true)
+
+  medicines Inventory[]
+  orders    MedOrder[]
+
+  @@index([isActive])
+}
+
+model Medicine {
+  id        String       @id @default(cuid())
+  name      String
+  brand     String?
+  form      MedicineForm
+  strength  String?
+  createdAt DateTime     @default(now())
+
+  inventories Inventory[]
+}
+
+model Inventory {
+  id         String   @id @default(cuid())
+  pharmacyId String
+  medicineId String
+  price      Decimal  @db.Decimal(10, 2)
+  stock      Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@unique([pharmacyId, medicineId])
+}
+
+model MedOrder {
+  id            String        @id @default(cuid())
+  patientId     String
+  pharmacyId    String
+  status        OrderStatus   @default(PENDING)
+  paymentStatus PaymentStatus @default(UNPAID)
+  addressId     String?
+  address       Address?      @relation(fields: [addressId], references: [id])
+  total         Decimal       @db.Decimal(10, 2) @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  patient  Patient  @relation(fields: [patientId], references: [id])
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+  items    MedOrderItem[]
+}
+
+model MedOrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  inventoryId String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+
+  order     MedOrder  @relation(fields: [orderId], references: [id])
+  inventory Inventory @relation(fields: [inventoryId], references: [id])
+
+  @@unique([orderId, inventoryId])
+}
+
+// ===== Shared =====
+
+model Address {
+  id         String   @id @default(cuid())
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String
+  latitude   Float?
+  longitude  Float?
+
+  // Back-relations are explicit on owning models via foreign keys
+}
+
+model UserAddress {
+  userId    String
+  addressId String
+  isPrimary Boolean @default(false)
+
+  user    User    @relation(fields: [userId], references: [id])
+  address Address @relation(fields: [addressId], references: [id])
+
+  @@id([userId, addressId])
+}
+
+model NotificationToken {
+  id        String               @id @default(cuid())
+  userId    String
+  token     String               @unique
+  platform  NotificationPlatform
+  createdAt DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
