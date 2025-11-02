@@ -10,7 +10,7 @@ router.post('/', async (req, res, next) => {
     const { description } = req.body;
     if (!description) return res.status(400).json({ error: 'description is required' });
     const result = await aiClassifySpecialty(description);
-    res.json({ ...result, allowedSpecialties: SPECIALTIES });
+    res.json({ ...result });
   } catch (err) {
     next(err);
   }

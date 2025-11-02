@@ -15,6 +15,7 @@ import patientsSos from './routes/patients/sos.js'
 import patientsMeds from './routes/patients/meds.js'
 import aiTriage from './routes/patients/ai-triage.js'
 import patientsHealth from './routes/patients/health.js'
+import patientsDoctors from './routes/patients/doctors.js'
 import publicDoctors from './routes/public/doctors.js'
 import { notFound, errorHandler } from './middlewares/errors.js'
 
@@ -47,6 +48,7 @@ app.use('/api/patients/sos', patientsSos)
 app.use('/api/patients', patientsMeds)
 app.use('/api/patients/triage', aiTriage)
 app.use('/api/patients/health', patientsHealth)
+app.use('/api/patients/doctors', patientsDoctors)
 
 // Public doctor info and search
 app.use('/api/public/doctors', publicDoctors)
