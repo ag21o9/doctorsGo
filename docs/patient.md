@@ -96,6 +96,35 @@ Response 200
 { "specialty": "GENERAL_PHYSICIAN", "confidence": 0.82, "allowedSpecialties": ["GENERAL_PHYSICIAN", "CARDIOLOGY", "..."] }
 ```
 
+POST /api/patients/triage/analyze
+
+Request
+```
+{ "description": "Fever, sore throat for 2 days" }
+```
+
+Response 200
+```
+{
+	"specialty": "GENERAL_PHYSICIAN",
+	"confidence": 0.82,
+	"reasoning": "Likely viral URTI...",
+	"analysis": {
+		"likelyConditions": [
+			{ "name": "Viral upper respiratory tract infection", "likelihood": 0.7, "rationale": "Acute fever + sore throat" },
+			{ "name": "Streptococcal pharyngitis", "likelihood": 0.3, "rationale": "Sore throat prominent" }
+		],
+		"symptomHighlights": ["fever", "sore throat"],
+		"urgency": "LOW",
+		"recommendedSpecialties": ["GENERAL_PHYSICIAN"],
+		"requiredEquipment": ["Thermometer", "Pulse oximeter"],
+		"suggestedTests": ["Rapid strep test", "CBC if persistent"],
+		"advice": "Hydration, rest, antipyretics; see a doctor if symptoms worsen",
+		"redFlags": ["Severe breathing difficulty", "Neck stiffness"]
+	}
+}
+```
+
 ---
 
 ## Appointments
